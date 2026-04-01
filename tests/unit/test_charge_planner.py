@@ -1,8 +1,8 @@
-"""Unit tests for charge_planner.estimate_grid_charge_needed."""
+"""Unit tests for charge_planner estimation functions."""
 
 import pytest
 
-from custom_components.solax_modbus.charge_planner import estimate_grid_charge_needed
+from custom_components.solax_modbus.charge_planner import estimate_grid_charge_needed, estimate_grid_export_available
 
 
 # ---------------------------------------------------------------------------
@@ -178,3 +178,138 @@ def test_raises_on_negative_solar() -> None:
 def test_raises_on_negative_consumption() -> None:
     with pytest.raises(ValueError, match="projected_consumption_kwh"):
         estimate_grid_charge_needed(50, 10, 80, 0, -1)
+
+
+# ===========================================================================
+# estimate_grid_export_available
+# ===========================================================================
+
+
+def test_export_basic_surplus() -> None:
+    """Battery at 80%, floor 20%, net solar fills to 100% → 8 kWh exportable."""
+    # current=8 kWh, net=3-1=2 kWh → projected=10 (capped), floor=2 → surplus=8
+    result = estimate_grid_export_available(
+        current_soc_pct=80,
+        battery_capacity_kwh=10,
+        min_soc_pct=20,
+        projected_solar_kwh=3.0,
+        projected_consumption_kwh=1.0,
+    )
+    assert result == 8.0
+
+
+def test_export_below_floor_returns_zero() -> None:
+    """Battery already below the self-sufficiency floor — no export available."""
+    result = estimate_grid_export_available(
+        current_soc_pct=50,
+        battery_capacity_kwh=10,
+        min_soc_pct=60,
+        projected_solar_kwh=0.0,
+    )
+    assert result == 0.0
+
+
+def test_export_solar_brings_above_floor() -> None:
+    """Battery below floor but solar lifts it above — surplus available."""
+    # current=3 kWh, floor=5 kWh, net solar=4 kWh → projected=7, surplus=2
+    result = estimate_grid_export_available(
+        current_soc_pct=30,
+        battery_capacity_kwh=10,
+        min_soc_pct=50,
+        projected_solar_kwh=4.0,
+    )
+    assert result == 2.0
+
+
+def test_export_projected_capped_at_capacity() -> None:
+    """Overflow solar is capped at battery capacity, not double-counted."""
+    # current=9 kWh, net solar=5 kWh → would be 14, capped at 10, floor=2 → surplus=8
+    result = estimate_grid_export_available(
+        current_soc_pct=90,
+        battery_capacity_kwh=10,
+        min_soc_pct=20,
+        projected_solar_kwh=5.0,
+    )
+    assert result == 8.0
+
+
+def test_export_zero_floor_full_projected_capacity() -> None:
+    """Floor of 0% — entire projected capacity is available for export."""
+    # current=5 kWh, net solar=3 kWh → projected=8, floor=0 → surplus=8
+    result = estimate_grid_export_available(
+        current_soc_pct=50,
+        battery_capacity_kwh=10,
+        min_soc_pct=0,
+        projected_solar_kwh=3.0,
+    )
+    assert result == 8.0
+
+
+def test_export_100_floor_returns_zero() -> None:
+    """Floor of 100% — nothing can be exported (must keep battery full)."""
+    result = estimate_grid_export_available(
+        current_soc_pct=100,
+        battery_capacity_kwh=10,
+        min_soc_pct=100,
+        projected_solar_kwh=5.0,
+    )
+    assert result == 0.0
+
+
+def test_export_negative_net_solar_reduces_surplus() -> None:
+    """Consumption exceeding solar shrinks the exportable amount."""
+    # current=8 kWh, net=-2 kWh → projected=6, floor=2 → surplus=4
+    result = estimate_grid_export_available(
+        current_soc_pct=80,
+        battery_capacity_kwh=10,
+        min_soc_pct=20,
+        projected_solar_kwh=1.0,
+        projected_consumption_kwh=3.0,
+    )
+    assert result == 4.0
+
+
+def test_export_consumption_drains_below_floor() -> None:
+    """High consumption pulls projected level below floor — no export."""
+    # current=5 kWh, net=-4 kWh → projected=1, floor=3 → surplus=-2 → 0
+    result = estimate_grid_export_available(
+        current_soc_pct=50,
+        battery_capacity_kwh=10,
+        min_soc_pct=30,
+        projected_solar_kwh=1.0,
+        projected_consumption_kwh=5.0,
+    )
+    assert result == 0.0
+
+
+def test_export_result_rounded_to_two_decimals() -> None:
+    result = estimate_grid_export_available(
+        current_soc_pct=100 / 3,
+        battery_capacity_kwh=10,
+        min_soc_pct=0,
+        projected_solar_kwh=0.0,
+    )
+    assert result == round(result, 2)
+
+
+# Input validation for estimate_grid_export_available
+
+
+def test_export_raises_on_invalid_min_soc() -> None:
+    with pytest.raises(ValueError, match="min_soc_pct"):
+        estimate_grid_export_available(50, 10, 101, 0)
+
+
+def test_export_raises_on_negative_min_soc() -> None:
+    with pytest.raises(ValueError, match="min_soc_pct"):
+        estimate_grid_export_available(50, 10, -1, 0)
+
+
+def test_export_raises_on_negative_capacity() -> None:
+    with pytest.raises(ValueError, match="battery_capacity_kwh"):
+        estimate_grid_export_available(50, -1, 20, 0)
+
+
+def test_export_raises_on_invalid_current_soc() -> None:
+    with pytest.raises(ValueError, match="current_soc_pct"):
+        estimate_grid_export_available(110, 10, 20, 0)

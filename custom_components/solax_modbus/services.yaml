@@ -68,3 +68,61 @@ estimate_grid_charge:
           max: 1000
           step: 0.1
           unit_of_measurement: kWh
+
+estimate_grid_export:
+  name: Estimate grid export available
+  description: >
+    Calculate how many kWh can be exported (sold) to the grid without the
+    battery falling below a self-sufficiency floor, after accounting for
+    projected solar generation and house consumption.
+
+    The battery is assumed to absorb net solar first (solar minus consumption).
+    If the resulting projected level exceeds full capacity, the overflow is
+    already passively exported and is not counted twice.
+
+    Returns a response dict with export_kwh and the inputs used.
+  fields:
+    name:
+      name: Hub name
+      description: Name of the hub (e.g., "SolaX")
+      required: true
+      example: SolaX
+    min_soc_pct:
+      name: Self-sufficiency floor (%)
+      description: >
+        Minimum battery SoC to preserve for self-sufficiency.  Energy below
+        this level is not available for export (0–100 %).
+      required: true
+      example: 20
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+    projected_solar_kwh:
+      name: Projected solar (kWh)
+      description: >
+        Expected solar (and any other renewable) generation between now and the
+        target time, in kWh.
+      required: true
+      example: 5.0
+      selector:
+        number:
+          min: 0
+          max: 1000
+          step: 0.1
+          unit_of_measurement: kWh
+    projected_consumption_kwh:
+      name: Projected house load (kWh)
+      description: >
+        Expected house consumption between now and the target time, in kWh.
+        Defaults to 0 (all solar available to charge the battery first).
+      required: false
+      example: 2.0
+      selector:
+        number:
+          min: 0
+          max: 1000
+          step: 0.1
+          unit_of_measurement: kWh
