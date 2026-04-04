@@ -31,7 +31,7 @@ from homeassistant.const import (
     UnitOfTemperature,
     UnitOfTime,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant, SupportsResponse, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -40,6 +40,7 @@ from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient
 from pymodbus.exceptions import ConnectionException, ModbusException, ModbusIOException
 from pymodbus.framer import FramerType
 
+from .charge_planner import estimate_grid_charge_needed, estimate_grid_export_available
 from .const import (
     BUTTONREPEAT_FIRST as BUTTONREPEAT_FIRST,
 )
@@ -436,6 +437,125 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     hass.services.async_register(DOMAIN, "growatt_charge_from_grid", _svc_growatt_charge_from_grid)
     hass.services.async_register(DOMAIN, "growatt_discharge_to_grid", _svc_growatt_discharge_to_grid)
     hass.services.async_register(DOMAIN, "growatt_stop_vpp_charge", _svc_growatt_stop_vpp_charge)
+
+    async def _svc_estimate_grid_charge(call: Any) -> dict[str, Any]:
+        """Estimate kWh to import from the grid to reach a target SoC."""
+        name = call.data.get("name")
+        domain_data = hass.data.get(DOMAIN, {})
+        rec = domain_data.get(name)
+        hub = rec.get("hub") if rec else None
+        if not hub:
+            _LOGGER.warning("estimate_grid_charge – hub '%s' not found", name)
+            return {"error": f"hub '{name}' not found"}
+
+        battery_soc: float | None = hub.data.get("battery_soc")
+        battery_capacity_kwh: float | None = hub.data.get("battery_capacity_kwh")
+
+        if battery_soc is None:
+            _LOGGER.warning("estimate_grid_charge – battery_soc not yet available for hub '%s'", name)
+            return {"error": "battery_soc not yet available"}
+        if battery_capacity_kwh is None or battery_capacity_kwh <= 0:
+            _LOGGER.warning("estimate_grid_charge – battery_capacity_kwh not yet available for hub '%s'", name)
+            return {"error": "battery_capacity_kwh not yet available"}
+
+        target_soc_pct: float = float(call.data["target_soc_pct"])
+        projected_solar_kwh: float = float(call.data["projected_solar_kwh"])
+        projected_consumption_kwh: float = float(call.data.get("projected_consumption_kwh", 0.0))
+
+        grid_charge_kwh = estimate_grid_charge_needed(
+            current_soc_pct=battery_soc,
+            battery_capacity_kwh=battery_capacity_kwh,
+            target_soc_pct=target_soc_pct,
+            projected_solar_kwh=projected_solar_kwh,
+            projected_consumption_kwh=projected_consumption_kwh,
+        )
+
+        _LOGGER.debug(
+            "estimate_grid_charge hub='%s' soc=%.1f%% capacity=%.2fkWh target=%.1f%% "
+            "solar=%.2fkWh load=%.2fkWh → grid=%.2fkWh",
+            name,
+            battery_soc,
+            battery_capacity_kwh,
+            target_soc_pct,
+            projected_solar_kwh,
+            projected_consumption_kwh,
+            grid_charge_kwh,
+        )
+        return {
+            "grid_charge_kwh": grid_charge_kwh,
+            "current_soc_pct": battery_soc,
+            "battery_capacity_kwh": battery_capacity_kwh,
+            "target_soc_pct": target_soc_pct,
+            "projected_solar_kwh": projected_solar_kwh,
+            "projected_consumption_kwh": projected_consumption_kwh,
+        }
+
+    hass.services.async_register(
+        DOMAIN,
+        "estimate_grid_charge",
+        _svc_estimate_grid_charge,
+        supports_response=SupportsResponse.ONLY,
+    )
+
+    async def _svc_estimate_grid_export(call: Any) -> dict[str, Any]:
+        """Estimate kWh exportable to the grid without compromising self-sufficiency."""
+        name = call.data.get("name")
+        domain_data = hass.data.get(DOMAIN, {})
+        rec = domain_data.get(name)
+        hub = rec.get("hub") if rec else None
+        if not hub:
+            _LOGGER.warning("estimate_grid_export – hub '%s' not found", name)
+            return {"error": f"hub '{name}' not found"}
+
+        battery_soc: float | None = hub.data.get("battery_soc")
+        battery_capacity_kwh: float | None = hub.data.get("battery_capacity_kwh")
+
+        if battery_soc is None:
+            _LOGGER.warning("estimate_grid_export – battery_soc not yet available for hub '%s'", name)
+            return {"error": "battery_soc not yet available"}
+        if battery_capacity_kwh is None or battery_capacity_kwh <= 0:
+            _LOGGER.warning("estimate_grid_export – battery_capacity_kwh not yet available for hub '%s'", name)
+            return {"error": "battery_capacity_kwh not yet available"}
+
+        min_soc_pct: float = float(call.data["min_soc_pct"])
+        projected_solar_kwh: float = float(call.data["projected_solar_kwh"])
+        projected_consumption_kwh: float = float(call.data.get("projected_consumption_kwh", 0.0))
+
+        export_kwh = estimate_grid_export_available(
+            current_soc_pct=battery_soc,
+            battery_capacity_kwh=battery_capacity_kwh,
+            min_soc_pct=min_soc_pct,
+            projected_solar_kwh=projected_solar_kwh,
+            projected_consumption_kwh=projected_consumption_kwh,
+        )
+
+        _LOGGER.debug(
+            "estimate_grid_export hub='%s' soc=%.1f%% capacity=%.2fkWh floor=%.1f%% "
+            "solar=%.2fkWh load=%.2fkWh → export=%.2fkWh",
+            name,
+            battery_soc,
+            battery_capacity_kwh,
+            min_soc_pct,
+            projected_solar_kwh,
+            projected_consumption_kwh,
+            export_kwh,
+        )
+        return {
+            "export_kwh": export_kwh,
+            "current_soc_pct": battery_soc,
+            "battery_capacity_kwh": battery_capacity_kwh,
+            "min_soc_pct": min_soc_pct,
+            "projected_solar_kwh": projected_solar_kwh,
+            "projected_consumption_kwh": projected_consumption_kwh,
+        }
+
+    hass.services.async_register(
+        DOMAIN,
+        "estimate_grid_export",
+        _svc_estimate_grid_export,
+        supports_response=SupportsResponse.ONLY,
+    )
+
     # _LOGGER.debug("solax data %d", hass.data)
     return True
 

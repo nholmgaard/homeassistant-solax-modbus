@@ -112,3 +112,118 @@ growatt_stop_vpp_charge:
       description: Name of the hub (e.g., "SolaX")
       required: true
       example: SolaX
+
+estimate_grid_charge:
+  name: Estimate grid charge needed
+  description: >
+    Calculate how many kWh must be imported from the grid to reach a target
+    battery state-of-charge by a given time, accounting for projected solar
+    generation and house consumption between now and that time.
+
+    Reads the current battery SoC and usable capacity (kWh) from the live
+    inverter data.  Returns a response dict with grid_charge_kwh and the
+    input values used for the calculation.
+
+    Use projected_consumption_kwh = 0 for a conservative estimate where all
+    solar is assumed to go directly into the battery.
+  fields:
+    name:
+      name: Hub name
+      description: Name of the hub (e.g., "SolaX")
+      required: true
+      example: SolaX
+    target_soc_pct:
+      name: Target SoC (%)
+      description: Desired battery state-of-charge at the target time (0–100 %).
+      required: true
+      example: 80
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+    projected_solar_kwh:
+      name: Projected solar (kWh)
+      description: >
+        Expected solar (and any other renewable) generation between now and the
+        target time, in kWh.
+      required: true
+      example: 4.5
+      selector:
+        number:
+          min: 0
+          max: 1000
+          step: 0.1
+          unit_of_measurement: kWh
+    projected_consumption_kwh:
+      name: Projected house load (kWh)
+      description: >
+        Expected house consumption between now and the target time, in kWh.
+        Defaults to 0 (all solar is available for battery charging).
+      required: false
+      example: 2.0
+      selector:
+        number:
+          min: 0
+          max: 1000
+          step: 0.1
+          unit_of_measurement: kWh
+
+estimate_grid_export:
+  name: Estimate grid export available
+  description: >
+    Calculate how many kWh can be exported (sold) to the grid without the
+    battery falling below a self-sufficiency floor, after accounting for
+    projected solar generation and house consumption.
+
+    The battery is assumed to absorb net solar first (solar minus consumption).
+    If the resulting projected level exceeds full capacity, the overflow is
+    already passively exported and is not counted twice.
+
+    Returns a response dict with export_kwh and the inputs used.
+  fields:
+    name:
+      name: Hub name
+      description: Name of the hub (e.g., "SolaX")
+      required: true
+      example: SolaX
+    min_soc_pct:
+      name: Self-sufficiency floor (%)
+      description: >
+        Minimum battery SoC to preserve for self-sufficiency.  Energy below
+        this level is not available for export (0–100 %).
+      required: true
+      example: 20
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+    projected_solar_kwh:
+      name: Projected solar (kWh)
+      description: >
+        Expected solar (and any other renewable) generation between now and the
+        target time, in kWh.
+      required: true
+      example: 5.0
+      selector:
+        number:
+          min: 0
+          max: 1000
+          step: 0.1
+          unit_of_measurement: kWh
+    projected_consumption_kwh:
+      name: Projected house load (kWh)
+      description: >
+        Expected house consumption between now and the target time, in kWh.
+        Defaults to 0 (all solar available to charge the battery first).
+      required: false
+      example: 2.0
+      selector:
+        number:
+          min: 0
+          max: 1000
+          step: 0.1
+          unit_of_measurement: kWh
