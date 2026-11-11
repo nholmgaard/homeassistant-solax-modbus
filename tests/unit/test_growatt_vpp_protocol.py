@@ -23,12 +23,12 @@ def test_vpp_protocol_version_sensor_register() -> None:
 
 def test_vpp_phase_and_meter_sensors_registers() -> None:
     expected = {
-        "grid_voltage_ab_vpp": (31106, REG_INPUT, REGISTER_U16),
-        "grid_voltage_bc_vpp": (31107, REG_INPUT, REGISTER_U16),
-        "grid_voltage_ca_vpp": (31108, REG_INPUT, REGISTER_U16),
-        "grid_current_l1_vpp": (31109, REG_INPUT, REGISTER_S16),
-        "grid_current_l2_vpp": (31110, REG_INPUT, REGISTER_S16),
-        "grid_current_l3_vpp": (31111, REG_INPUT, REGISTER_S16),
+        "grid_voltage_ab": (31106, REG_INPUT, REGISTER_U16),
+        "grid_voltage_bc": (31107, REG_INPUT, REGISTER_U16),
+        "grid_voltage_ca": (31108, REG_INPUT, REGISTER_U16),
+        "grid_current_phase_a": (31109, REG_INPUT, REGISTER_S16),
+        "grid_current_phase_b": (31110, REG_INPUT, REGISTER_S16),
+        "grid_current_phase_c": (31111, REG_INPUT, REGISTER_S16),
         "meter_power_vpp": (31112, REG_INPUT, REGISTER_S32),
     }
 
@@ -39,6 +39,9 @@ def test_vpp_phase_and_meter_sensors_registers() -> None:
         assert description.register_type == register_type
         assert description.register_data_type == data_type
         assert description.scale == 0.1
+        if key != "meter_power_vpp":
+            assert description.entity_registry_enabled_default is True
+            assert description.depends_on is None
 
 
 def test_vpp_battery_wakeup_button() -> None:
