@@ -480,6 +480,10 @@ def value_function_firmware_control_version(initval: int, descr: Any, datadict: 
     return f"{fw_ascii}-{fw_ver}"
 
 
+def value_function_vpp_protocol_version(initval: int, descr: Any, datadict: dict[str, Any]) -> str:
+    return f"V{initval // 100}.{initval % 100:02d}"
+
+
 def value_function_inverter_state(initval: int, descr: Any, datadict: dict[str, Any]) -> str:
     inverter_state = int(datadict.get("register_3000", 0))
     inverter_state = inverter_state >> 8  # Remove the lower 8 bits by right-shifting by 8 bits
@@ -9562,6 +9566,14 @@ SENSOR_TYPES: list[GrowattModbusSensorEntityDescription] = [
     #    VPP 2.05 31xxx input registers
     # ===================================
     GrowattModbusSensorEntityDescription(
+        name="VPP Protocol Version",
+        key="vpp_protocol_version",
+        register=30099,
+        register_data_type=REGISTER_U16,
+        value_function=value_function_vpp_protocol_version,
+        allowedtypes=ALL_GEN_GROUP,
+    ),
+    GrowattModbusSensorEntityDescription(
         name="Inverter Status VPP",
         key="inverter_operating_status_vpp",
         register=31000,
@@ -9732,6 +9744,88 @@ SENSOR_TYPES: list[GrowattModbusSensorEntityDescription] = [
         scale=0.1,
         rounding=1,
         allowedtypes=GEN | GEN3 | GEN4 | SPF,  # not implemented on GEN2 (MOD TL3-X answers 0x01)
+    ),
+    GrowattModbusSensorEntityDescription(
+        name="Grid Voltage AB VPP",
+        key="grid_voltage_ab_vpp",
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        device_class=SensorDeviceClass.VOLTAGE,
+        register=31106,
+        register_type=REG_INPUT,
+        scale=0.1,
+        rounding=1,
+        allowedtypes=GEN | GEN3 | GEN4 | SPF,
+    ),
+    GrowattModbusSensorEntityDescription(
+        name="Grid Voltage BC VPP",
+        key="grid_voltage_bc_vpp",
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        device_class=SensorDeviceClass.VOLTAGE,
+        register=31107,
+        register_type=REG_INPUT,
+        scale=0.1,
+        rounding=1,
+        allowedtypes=GEN | GEN3 | GEN4 | SPF,
+    ),
+    GrowattModbusSensorEntityDescription(
+        name="Grid Voltage CA VPP",
+        key="grid_voltage_ca_vpp",
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        device_class=SensorDeviceClass.VOLTAGE,
+        register=31108,
+        register_type=REG_INPUT,
+        scale=0.1,
+        rounding=1,
+        allowedtypes=GEN | GEN3 | GEN4 | SPF,
+    ),
+    GrowattModbusSensorEntityDescription(
+        name="Grid Current L1 VPP",
+        key="grid_current_l1_vpp",
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        register=31109,
+        register_type=REG_INPUT,
+        register_data_type=REGISTER_S16,
+        scale=0.1,
+        rounding=1,
+        allowedtypes=GEN | GEN3 | GEN4 | SPF,
+    ),
+    GrowattModbusSensorEntityDescription(
+        name="Grid Current L2 VPP",
+        key="grid_current_l2_vpp",
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        register=31110,
+        register_type=REG_INPUT,
+        register_data_type=REGISTER_S16,
+        scale=0.1,
+        rounding=1,
+        allowedtypes=GEN | GEN3 | GEN4 | SPF,
+    ),
+    GrowattModbusSensorEntityDescription(
+        name="Grid Current L3 VPP",
+        key="grid_current_l3_vpp",
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        register=31111,
+        register_type=REG_INPUT,
+        register_data_type=REGISTER_S16,
+        scale=0.1,
+        rounding=1,
+        allowedtypes=GEN | GEN3 | GEN4 | SPF,
+    ),
+    GrowattModbusSensorEntityDescription(
+        name="Meter Power VPP",
+        key="meter_power_vpp",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        register=31112,
+        register_type=REG_INPUT,
+        register_data_type=REGISTER_S32,
+        scale=0.1,
+        rounding=1,
+        allowedtypes=GEN | GEN3 | GEN4 | SPF,
     ),
     GrowattModbusSensorEntityDescription(
         name="Battery Combined Power VPP",
