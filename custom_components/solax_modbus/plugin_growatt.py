@@ -628,6 +628,14 @@ def value_function_inverter_module(initval: int, descr: Any, datadict: dict[str,
 
 BUTTON_TYPES = [
     GrowattModbusButtonEntityDescription(
+        name="Battery Wake Up",
+        key="battery_wakeup",
+        register=30495,
+        command=1,
+        allowedtypes=HYBRID,
+        icon="mdi:battery-sync",
+    ),
+    GrowattModbusButtonEntityDescription(
         name="Active Power Not Limited",
         key="active_power_not_limited",
         register=3,
@@ -10500,6 +10508,9 @@ def _inverter_type_from_prefix(identifier: str | None, prefix_types: dict[str, i
 
 @dataclass(kw_only=True)
 class growatt_plugin(plugin_base):
+    def wakeupButton(self) -> str:
+        return "battery_wakeup"
+
     async def async_determineInverterType(self, hub: Any, configdict: dict[str, Any]) -> int:
         _LOGGER.info("%s: trying to determine inverter type", hub.name)
         invertertype = 0

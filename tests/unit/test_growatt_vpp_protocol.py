@@ -1,7 +1,7 @@
 import pytest
 
 from custom_components.solax_modbus.const import REG_HOLDING, REG_INPUT, REGISTER_S16, REGISTER_S32, REGISTER_U16
-from custom_components.solax_modbus.plugin_growatt import SENSOR_TYPES, value_function_vpp_protocol_version
+from custom_components.solax_modbus.plugin_growatt import BUTTON_TYPES, SENSOR_TYPES, plugin_instance, value_function_vpp_protocol_version
 
 
 @pytest.mark.parametrize(
@@ -39,3 +39,12 @@ def test_vpp_phase_and_meter_sensors_registers() -> None:
         assert description.register_type == register_type
         assert description.register_data_type == data_type
         assert description.scale == 0.1
+
+
+def test_vpp_battery_wakeup_button() -> None:
+    button = next(button for button in BUTTON_TYPES if button.key == "battery_wakeup")
+
+    assert button.name == "Battery Wake Up"
+    assert button.register == 30495
+    assert button.command == 1
+    assert plugin_instance.wakeupButton() == "battery_wakeup"
