@@ -627,6 +627,7 @@ def value_function_inverter_module(initval: int, descr: Any, datadict: dict[str,
 # ================================= Button Declarations ============================================================
 
 BUTTON_TYPES = [
+    # Battery wake-up command is available with VPP protocol V2.05.
     GrowattModbusButtonEntityDescription(
         name="Battery Wake Up",
         key="battery_wakeup",
