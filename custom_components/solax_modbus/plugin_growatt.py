@@ -9562,9 +9562,7 @@ SENSOR_TYPES: list[GrowattModbusSensorEntityDescription] = [
         rounding=1,
         allowedtypes=SPF,
     ),
-    # ===================================
-    #    VPP 2.05 31xxx input registers
-    # ===================================
+    # VPP protocol version (holding register)
     GrowattModbusSensorEntityDescription(
         name="VPP Protocol Version",
         key="vpp_protocol_version",
@@ -9573,6 +9571,9 @@ SENSOR_TYPES: list[GrowattModbusSensorEntityDescription] = [
         value_function=value_function_vpp_protocol_version,
         allowedtypes=ALL_GEN_GROUP,
     ),
+    # ===================================
+    #    VPP 2.05 31xxx input registers
+    # ===================================
     GrowattModbusSensorEntityDescription(
         name="Inverter Status VPP",
         key="inverter_operating_status_vpp",
