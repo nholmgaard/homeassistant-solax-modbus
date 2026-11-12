@@ -480,6 +480,10 @@ def value_function_firmware_control_version(initval: int, descr: Any, datadict: 
     return f"{fw_ascii}-{fw_ver}"
 
 
+def value_function_vpp_protocol_version(initval: int, descr: Any, datadict: dict[str, Any]) -> str:
+    return f"V{initval // 100}.{initval % 100:02d}"
+
+
 def value_function_inverter_state(initval: int, descr: Any, datadict: dict[str, Any]) -> str:
     inverter_state = int(datadict.get("register_3000", 0))
     inverter_state = inverter_state >> 8  # Remove the lower 8 bits by right-shifting by 8 bits
@@ -623,6 +627,15 @@ def value_function_inverter_module(initval: int, descr: Any, datadict: dict[str,
 # ================================= Button Declarations ============================================================
 
 BUTTON_TYPES = [
+    # Battery wake-up command is available with VPP protocol V2.05.
+    GrowattModbusButtonEntityDescription(
+        name="Battery Wake Up",
+        key="battery_wakeup",
+        register=30495,
+        command=1,
+        allowedtypes=HYBRID,
+        icon="mdi:battery-sync",
+    ),
     GrowattModbusButtonEntityDescription(
         name="Active Power Not Limited",
         key="active_power_not_limited",
@@ -9558,6 +9571,15 @@ SENSOR_TYPES: list[GrowattModbusSensorEntityDescription] = [
         rounding=1,
         allowedtypes=SPF,
     ),
+    # VPP protocol version (holding register)
+    GrowattModbusSensorEntityDescription(
+        name="VPP Protocol Version",
+        key="vpp_protocol_version",
+        register=30099,
+        register_data_type=REGISTER_U16,
+        value_function=value_function_vpp_protocol_version,
+        allowedtypes=ALL_GEN_GROUP,
+    ),
     # ===================================
     #    VPP 2.05 31xxx input registers
     # ===================================
@@ -9732,6 +9754,94 @@ SENSOR_TYPES: list[GrowattModbusSensorEntityDescription] = [
         scale=0.1,
         rounding=1,
         allowedtypes=GEN | GEN3 | GEN4 | SPF,  # not implemented on GEN2 (MOD TL3-X answers 0x01)
+    ),
+    GrowattModbusSensorEntityDescription(
+        name="Grid Voltage AB",
+        key="grid_voltage_ab",
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        device_class=SensorDeviceClass.VOLTAGE,
+        register=31106,
+        register_type=REG_INPUT,
+        scale=0.1,
+        rounding=1,
+        allowedtypes=GEN | GEN3 | GEN4 | SPF,
+        entity_registry_enabled_default=True,
+    ),
+    GrowattModbusSensorEntityDescription(
+        name="Grid Voltage BC",
+        key="grid_voltage_bc",
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        device_class=SensorDeviceClass.VOLTAGE,
+        register=31107,
+        register_type=REG_INPUT,
+        scale=0.1,
+        rounding=1,
+        allowedtypes=GEN | GEN3 | GEN4 | SPF,
+        entity_registry_enabled_default=True,
+    ),
+    GrowattModbusSensorEntityDescription(
+        name="Grid Voltage CA",
+        key="grid_voltage_ca",
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        device_class=SensorDeviceClass.VOLTAGE,
+        register=31108,
+        register_type=REG_INPUT,
+        scale=0.1,
+        rounding=1,
+        allowedtypes=GEN | GEN3 | GEN4 | SPF,
+        entity_registry_enabled_default=True,
+    ),
+    GrowattModbusSensorEntityDescription(
+        name="Grid Current Phase A",
+        key="grid_current_phase_a",
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        register=31109,
+        register_type=REG_INPUT,
+        register_data_type=REGISTER_S16,
+        scale=0.1,
+        rounding=1,
+        allowedtypes=GEN | GEN3 | GEN4 | SPF,
+        entity_registry_enabled_default=True,
+    ),
+    GrowattModbusSensorEntityDescription(
+        name="Grid Current Phase B",
+        key="grid_current_phase_b",
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        register=31110,
+        register_type=REG_INPUT,
+        register_data_type=REGISTER_S16,
+        scale=0.1,
+        rounding=1,
+        allowedtypes=GEN | GEN3 | GEN4 | SPF,
+        entity_registry_enabled_default=True,
+    ),
+    GrowattModbusSensorEntityDescription(
+        name="Grid Current Phase C",
+        key="grid_current_phase_c",
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        register=31111,
+        register_type=REG_INPUT,
+        register_data_type=REGISTER_S16,
+        scale=0.1,
+        rounding=1,
+        allowedtypes=GEN | GEN3 | GEN4 | SPF,
+        entity_registry_enabled_default=True,
+    ),
+    GrowattModbusSensorEntityDescription(
+        name="Meter Power VPP",
+        key="meter_power_vpp",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        register=31112,
+        register_type=REG_INPUT,
+        register_data_type=REGISTER_S32,
+        scale=0.1,
+        rounding=1,
+        allowedtypes=GEN | GEN3 | GEN4 | SPF,
     ),
     GrowattModbusSensorEntityDescription(
         name="Battery Combined Power VPP",
@@ -10405,6 +10515,9 @@ def _inverter_type_from_prefix(identifier: str | None, prefix_types: dict[str, i
 
 @dataclass(kw_only=True)
 class growatt_plugin(plugin_base):
+    def wakeupButton(self) -> str:
+        return "battery_wakeup"
+
     async def async_determineInverterType(self, hub: Any, configdict: dict[str, Any]) -> int:
         _LOGGER.info("%s: trying to determine inverter type", hub.name)
         invertertype = 0
